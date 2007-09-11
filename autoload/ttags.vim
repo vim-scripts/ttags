@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-09-09.
-" @Last Change: 2007-09-09.
-" @Revision:    63
+" @Last Change: 2007-09-11.
+" @Revision:    73
 
 if &cp || exists("loaded_ttags_autoload")
     finish
@@ -14,9 +14,25 @@ let loaded_ttags_autoload = 1
 let s:tags = {}
 
 
-" :def: function! ttags#List(use_cache, ?rx='', ?file_rx='')
+function! ttags#Kinds() "{{{3
+    let kinds = {}
+    for t in taglist('.')
+        let k = t.kind
+        if !empty(k)
+            if has_key(kinds, k)
+                let kinds[k] += 1
+            else
+                let kinds[k] = 0
+            endif
+        endif
+    endfor
+    return kinds
+endf
+
+
+" :def: function! ttags#List(use_cache, ?kind='', ?rx='', ?file_rx='')
 function! ttags#List(use_cache, ...) "{{{3
-    TVarArg 'rx', 'file_rx'
+    TVarArg 'kind', 'rx', 'file_rx'
     " TLogVAR rx, file_rx
     let world  = copy(g:ttags_world)
     let tagsid = string(tagfiles())
@@ -26,10 +42,13 @@ function! ttags#List(use_cache, ...) "{{{3
         " TLogDBG 'Use cache for: '. tagsid
     endif
     let world.tags = s:tags[tagsid]
-    if !empty(rx)
+    if !empty(kind) && kind != '*'
+        call filter(world.tags, 'v:val.kind =~ "['. kind .']"')
+    endif
+    if !empty(rx) && rx != '*'
         call filter(world.tags, 'v:val.name =~ rx')
     endif
-    if !empty(file_rx)
+    if !empty(file_rx) && file_rx != '*'
         call filter(world.tags, 'v:val.filename =~ file_rx')
     endif
     " TLogVAR world.tags

@@ -1,11 +1,11 @@
-" ttags.vim -- A simple tags list
+" ttags.vim -- Tag list browser (List, filter, preview, jump to tags)
 " @Author:      Thomas Link (micathom AT gmail com?subject=[vim])
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-09-09.
 " @Last Change: 2007-09-11.
-" @Revision:    0.1.37
-" GetLatestVimScripts: 0 1 ttags.vim
+" @Revision:    0.2.51
+" GetLatestVimScripts: 2018 1 ttags.vim
 
 if &cp || exists("loaded_ttags")
     finish
@@ -14,7 +14,7 @@ if !exists('g:loaded_tlib') || g:loaded_tlib < 12
     echoerr 'tlib >= 0.12 is required'
     finish
 endif
-let loaded_ttags = 1
+let loaded_ttags = 2
 
 let s:save_cpo = &cpo
 set cpo&vim
@@ -35,7 +35,7 @@ TLet g:ttags_world = tlib#World#New({
             \ })
 
 
-" :display: TTags[!] [TAGS_RX] [FILE_RX]
+" :display: TTags[!] [KIND] [TAGS_RX] [FILE_RX]
 " See also |ttags#List()|.
 command! -nargs=* -bang TTags call ttags#List(0, <f-args>)
 
@@ -47,7 +47,10 @@ let &cpo = s:save_cpo
 unlet s:save_cpo
 
 finish
-:TTags [TAGS_RX] [FILE_RX]
+
+:TTags [KIND] [TAGS_RX] [FILE_RX]
+In order to match any kind/rx, use *.
+E.g. TTags * * _foo.vim$
 
 Features:
     - List tags
@@ -56,11 +59,18 @@ Features:
 
 Suggested key maps:
 noremap <m-g>     :TTags<cr>
-noremap <Leader>g :TTags<cr>
-noremap <Leader>G :TTags <c-r><c-w><cr>
+noremap <Leader>g. :TTags<cr>
+noremap <Leader>g# :TTags * <c-r><c-w><cr>
+for c in split('abcdefghijklmnopqrstuvwxyz', '\zs')
+    exec 'noremap <Leader>g'. c .' :TTags '. c .'<cr>'
+endfor
 
 
 CHANGES
 0.1
 Initial release
+
+0.2
+- The kind argument was introduced (i.e. the argument list has changed)
+- * was defined as "match any".
 
