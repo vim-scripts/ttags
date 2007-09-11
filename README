@@ -1,0 +1,15 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=2018
+
+:TTags [KIND] [TAGS_RX] [FILE_RX]
+In order to match any kind/rx, use *.
+E.g. TTags * * _foo.vim$
+
+Features:
+    - List tags
+    - Filter tags matching a pattern
+    - Jump/Preview tags
+    - Insert tags (and a template for the argument list if supported by 
+      tSkeleton (vimscript #1160), which has to be installed for this)
+
+You can use :echo keys(ttags#Kinds())<cr> to find out which kinds are defined.
+
