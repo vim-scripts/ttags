@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-09-09.
-" @Last Change: 2007-09-29.
-" @Revision:    0.3.87
+" @Last Change: 2007-11-04.
+" @Revision:    0.4.135
 " GetLatestVimScripts: 2018 1 ttags.vim
 "
 " TODO:
@@ -14,18 +14,26 @@
 if &cp || exists("loaded_ttags")
     finish
 endif
-if !exists('g:loaded_tlib') || g:loaded_tlib < 14
-    echoerr 'tlib >= 0.14 is required'
+if !exists('g:loaded_tlib') || g:loaded_tlib < 19
+    echoerr 'tlib >= 0.19 is required'
     finish
 endif
-let loaded_ttags = 3
+let loaded_ttags = 4
 
 let s:save_cpo = &cpo
 set cpo&vim
 
 TLet g:ttags_kinds   = ''
-TLet g:ttags_tags_rx = ''
-TLet g:ttags_file_rx = ''
+TLet g:ttags_name_rx = ''
+TLet g:ttags_filename_rx = ''
+
+" How to display the tags list. Can be one of: tlib, quickfix, locations
+TLet g:ttags_display = 'tlib'
+
+" The name of a function, which takes the filename as argument, that 
+" rewrites the tag filename (e.g. in order to circumvent 
+" incompatibilities between cygwin ctags & windows vim).
+TLet g:ttags_rewrite = ''
 
 " :nodefault:
 " This variable can be buffer local.
@@ -48,7 +56,6 @@ TLet g:ttags_world = {
             \ 'pick_last_item': 0,
             \ 'scratch': '__tags__',
             \ 'return_agent': 'ttags#GotoTag',
-            \ 'scratch_vertical': 1,
             \ 'key_handlers': [
                 \ {'key': 16, 'agent': 'ttags#PreviewTag',  'key_name': '<c-p>', 'help': 'Preview'},
                 \ {'key':  7, 'agent': 'ttags#GotoTag',     'key_name': '<c-g>', 'help': 'Jump (don''t close the list)'},
@@ -56,11 +63,29 @@ TLet g:ttags_world = {
                 \ {'key': 20, 'agent': 'ttags#InsertTemplate',  'key_name': '<c-t>', 'help': 'Insert template'},
             \ ],
             \ }
+            " \ 'scratch_vertical': 1,
+            " \ 'resize_vertical': '&co / 3',
 
 
 " :display: TTags[!] [KIND] [TAGS_RX] [FILE_RX]
 " See also |ttags#List()|.
-command! -nargs=* -bang TTags call ttags#List(0, <f-args>)
+command! -nargs=* -bang TTags call ttags#List(!empty('<bang>'), <f-args>)
+
+
+" :display: TTagselect[!] kind:KIND FIELD:REGEXP ...
+" For values of field see |taglist()|. These fields depend also on your 
+" tags generator.
+"
+" If you want to automatically restict your searches to the current 
+" namespace, you would have to write a function that determines the 
+" namespace (and maybe e-mail it to me) and then call 
+" |ttags#SelectTags()|.
+"
+" Examples:
+"   " Show tags matching "bar" in class "Foo"
+"   TTagselect name:bar class:Foo
+command! -nargs=* -bang TTagselect call ttags#Select(!empty('<bang>'), <q-args>)
+
 
 " With !, rebuild the tags list.
 " command! -nargs=* -bang TTags call ttags#List(empty('<bang>'), <f-args>)
@@ -70,29 +95,6 @@ let &cpo = s:save_cpo
 unlet s:save_cpo
 
 finish
-
-:TTags [KIND] [TAGS_RX] [FILE_RX]
-In order to match any kind/rx, use *.
-E.g. TTags * * _foo.vim$
-
-Features:
-    - List tags
-    - Filter tags matching a pattern
-    - Jump/Preview tags
-    - Insert tags (and a template for the argument list if supported by 
-      tSkeleton, which has to be installed for this)
-
-Suggested key maps: >
-
-    noremap <Leader>g. :TTags<cr>
-    noremap <Leader>g# :TTags * <c-r><c-w><cr>
-    for c in split('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', '\zs')
-        exec 'noremap <Leader>g'. c .' :TTags '. c .'<cr>'
-    endfor
-
-You can use :echo keys(ttags#Kinds())<cr> to find out which kinds are defined.
-
-
 CHANGES
 0.1
 Initial release
@@ -113,4 +115,24 @@ argument list.
 - g:ttags_world can be a normal dictionary (use tlib#input#ListD instead
 of #ListW)
 - Require tlib 0.14
+
+0.4
+- New: ttags#Select() that matches any field
+- New: TTagselect command that takes a key list as argument to match any 
+field.
+- New: [wbg]:ttags_constraints configuration variable (a dictionary with 
+regexps).
+- If the commands TTags and TTagselect are called with [!], 
+g:tlib_tags_extra is used to temporarily scan additional tag files.
+- If a variable [bg]:ttags_rewrite is defined, it is used as function 
+name to rewrite tag filesname (eg to prevent name incompatibilities 
+between cygwin ctag & windows vim).
+- "[wbg]:ttags_tags_rx" was renamed to "[wbg]:ttags_name_rx"
+- "[wbg]:ttags_file_rx" was renamed to "[wbg]:ttags_filename_rx"
+- g:ttags_display: Alternatively use "locations" or "quickfix" lists to 
+display the tags (default: "tlib").
+- Require tlib 0.19
+- Previously, all tags were retrieved and filtered only later on. The 
+idea was to save time by caching the tags information. Now the initial 
+filtering by name is done by |taglist()| right away, which seems faster.
 

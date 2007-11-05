@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-09-09.
-" @Last Change: 2007-09-29.
-" @Revision:    144
+" @Last Change: 2007-11-04.
+" @Revision:    271
 
 if &cp || exists("loaded_ttags_autoload")
     finish
@@ -50,62 +50,124 @@ function! ttags#Highlight(tags) "{{{3
             else
                 let kindg = kind
             end
-            call add(acc, 'syn match TTags_'. kindg .' /\C'. kind .': \zs\S\+/')
+            call add(acc, 'syn match TTags_'. kindg .' /\C'. kind .': \zs.\{-}\ze\($\|\s|\s\)/')
             call add(acc, 'hi def link TTags_'. kindg .' '. hi)
         endif
     endfor
     let acc += [
-                \ 'syn match TTags_source / @\zs.*$/',
-                \ 'hi def link TTags_source Directory'
+                \ 'syn match TTags_source_dir / @\zs.*$/',
+                \ 'hi def link TTags_source_dir Directory'
                 \ ]
     " TLogVAR acc
     return join(acc, ' | ')
 endf
 
 
-" :def: function! ttags#List(use_cache, ?kind='', ?rx='', ?file_rx='')
-function! ttags#List(use_cache, ...) "{{{3
+" :def: function! ttags#List(use_extra, ?kind='', ?rx='', ?file_rx='')
+" Calls |ttags#SelectTags()|.
+function! ttags#List(use_extra, ...) "{{{3
     TVarArg ['kind', tlib#var#Get('ttags_kinds', 'wbg')],
-                \ ['rx', tlib#var#Get('ttags_tags_rx', 'wbg')],
-                \ ['file_rx', tlib#var#Get('ttags_file_rx', 'wbg')]
+                \ ['rx', tlib#var#Get('ttags_name_rx', 'wbg')],
+                \ ['file_rx', tlib#var#Get('ttags_filename_rx', 'wbg')]
     " TLogVAR rx, file_rx
-    let world  = copy(g:ttags_world)
-    let tagsid = string(tagfiles())
-    if !a:use_cache || empty(get(s:tags, tagsid))
-        let s:tags[tagsid] = taglist('.')
-    else
-        " TLogDBG 'Use cache for: '. tagsid
-    endif
-    let world.tags = s:tags[tagsid]
-    if !empty(kind) && kind != '*'
-        call filter(world.tags, 'v:val.kind =~ "['. kind .']"')
-    endif
-    if !empty(rx) && rx != '*'
-        call filter(world.tags, 'v:val.name =~ rx')
-    endif
-    if !empty(file_rx) && file_rx != '*'
-        call filter(world.tags, 'v:val.filename =~ file_rx')
-    endif
+    call ttags#SelectTags(a:use_extra, {'name': rx, 'kind': kind, 'filename': file_rx})
+endf
+
+
+" Calls |ttags#SelectTags()|.
+function! ttags#Select(use_extra, keyargs_as_string) "{{{3
+    let constraints = s:ParseArgs(a:keyargs_as_string)
+    call ttags#SelectTags(a:use_extra, constraints)
+endf
+
+
+function! s:ParseArgs(keyargs_as_string) "{{{3
+    let constraints = tlib#var#Get('ttags_constraints', 'wbg', {})
+    let constraints = extend(constraints, tlib#arg#StringAsKeyArgs(a:keyargs_as_string))
+    return constraints
+endf
+
+
+" Arguments:
+"   use_extra: Use extra tags (see |g:tlib_tags_extra|).
+"   constraints: A dictionary of fields and corresponding regexps
+function! ttags#SelectTags(use_extra, constraints) "{{{3
+    let world      = copy(g:ttags_world)
+    let world.tags = tlib#tag#Collect(a:constraints, a:use_extra)
     " TLogVAR world.tags
     if !empty(world.tags)
-        let world.base = map(copy(world.tags), 'printf("%s: %-20s %s @%s", v:val.kind, v:val.name, fnamemodify(v:val.filename, ":t"), fnamemodify(v:val.filename, ":p:h"))')
-        " TLogVAR world.base
-        if tlib#cmd#UseVertical('TTags')
-            let world.scratch_vertical = 1
-        endif
-        if get(world, 'scratch_vertical')
-            let sizes = map(copy(world.base), 'len(matchstr(v:val, ''^.\{-}\ze@''))')
-            let world.resize_vertical = max(sizes) + len(len(world.base)) + 2
-        endif
-        " if kind == '*'
+        let display = tlib#var#Get('ttags_display', 'bg')
+        if display == 'locations'
+            call setloclist(0, s:MakeQFL(world.tags))
+            lwindow
+        elseif display == 'quickfix'
+            call setqflist(s:MakeQFL(world.tags))
+            cwindow
+        else
+            let world.base = map(copy(world.tags), 's:FormatTag(v:val)')
+            " TLogVAR world.base
+            if tlib#cmd#UseVertical('TTags')
+                let world.scratch_vertical = 1
+            endif
             let world.tlib_UseInputListScratch = ttags#Highlight(world.tags)
-        " endif
-        call tlib#input#ListD(world)
+            call tlib#input#ListD(world)
+        endif
     else
-        echohl Error
-        echom 'ttags: No tags'
-        echohl NONE
+        call s:NoTags()
     endif
+endf
+
+
+function! s:NoTags() "{{{3
+    echohl Error
+    echom 'ttags: No tags'
+    echohl NONE
+endf
+
+
+function! s:FormatTag(tag) "{{{3
+    if a:tag.kind =~# '^[fm]'
+        if has_key(a:tag, 'signature')
+            let name = a:tag.name . a:tag.signature
+        elseif a:tag.cmd[0] == '/'
+            let name = a:tag.cmd
+            let name = substitute(name, '^/\^\?\s*', '', '')
+            let name = substitute(name, '\s*\$\?/$', '', '')
+        else
+            let name = a:tag.name
+        endif
+    else
+        let name = a:tag.name
+    endif
+    return printf('%s: %s | %s (%s)', a:tag.kind, name, fnamemodify(a:tag.filename, ":t"), fnamemodify(a:tag.filename, ":p:h"))
+endf
+
+
+function! s:MakeQFL(tags) "{{{3
+    return map(copy(a:tags), 's:MakeQFE(v:val)')
+endf
+
+
+function! s:MakeQFE(tag) "{{{3
+    let rv = {}
+    for [o, n] in [['filename', 'filename'], ['cmd', 'pattern'], ['kind', 'type']]
+        let v = get(a:tag, o)
+        if !empty(v)
+            if o == 'cmd'
+                if v =~ '^/.\{-}/$'
+                    let v = v[1:-2]
+                elseif v[0] == '/'
+                    let v = v[1:-1]
+                else
+                    let v = matchstr(v, '^\d\+')
+                    let n = 'lnum'
+                endif
+            endif
+            let rv[n] = v
+        endif
+        unlet v
+    endfor
+    return rv
 endf
 
 
@@ -117,7 +179,12 @@ endf
 function! s:ShowTag(world, tagline) "{{{3
     let tag = s:GetTag(a:world, a:tagline)
     " TLogVAR tag.filename
-    call tlib#file#With('edit', 'buffer', [tag.filename], a:world)
+    let rewriter = tlib#var#Get('ttags_rewrite', 'bg')
+    let filename = tag.filename
+    if !empty(rewriter)
+        let filename = call(rewriter, [filename])
+    endif
+    call tlib#file#With('edit', 'buffer', [filename], a:world)
     " TLogVAR tag.cmd
     exec tag.cmd
     norm! zz
@@ -160,6 +227,11 @@ function! ttags#InsertTemplate(world, selected) "{{{3
     exec back
     let a:world.state = 'exit'
     return a:world
+endf
+
+
+function! ttags#RewriteCygwinTag(filename) "{{{3
+    return substitute(a:filename, '^.\{-}[\/]cygdrive[\/]\(.\)', '\1:', '')
 endf
 
 
