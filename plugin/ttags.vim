@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-09-09.
-" @Last Change: 2007-11-04.
-" @Revision:    0.4.135
+" @Last Change: 2007-11-11.
+" @Revision:    0.5.146
 " GetLatestVimScripts: 2018 1 ttags.vim
 "
 " TODO:
@@ -14,11 +14,11 @@
 if &cp || exists("loaded_ttags")
     finish
 endif
-if !exists('g:loaded_tlib') || g:loaded_tlib < 19
-    echoerr 'tlib >= 0.19 is required'
+if !exists('g:loaded_tlib') || g:loaded_tlib < 20
+    echoerr 'tlib >= 0.20 is required'
     finish
 endif
-let loaded_ttags = 4
+let loaded_ttags = 5
 
 let s:save_cpo = &cpo
 set cpo&vim
@@ -34,6 +34,12 @@ TLet g:ttags_display = 'tlib'
 " rewrites the tag filename (e.g. in order to circumvent 
 " incompatibilities between cygwin ctags & windows vim).
 TLet g:ttags_rewrite = ''
+
+" Show tags that begin with the pattern. Can be buffer-local.
+TLet g:ttags_match_front = 1
+
+" Show tags that end with the pattern. Can be buffer-local.
+TLet g:ttags_match_end   = 1
 
 " :nodefault:
 " This variable can be buffer local.
@@ -135,4 +141,10 @@ display the tags (default: "tlib").
 - Previously, all tags were retrieved and filtered only later on. The 
 idea was to save time by caching the tags information. Now the initial 
 filtering by name is done by |taglist()| right away, which seems faster.
+
+0.5
+- More compact view of tags (via |g:tlib_tag_substitute|)
+- When previewing tags, restore the original position when closing the tags list
+- g:ttags_match_front, g:ttags_match_end
+- Require tlib >= 0.20
 

@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-09-09.
-" @Last Change: 2007-11-04.
-" @Revision:    271
+" @Last Change: 2007-11-11.
+" @Revision:    291
 
 if &cp || exists("loaded_ttags_autoload")
     finish
@@ -55,7 +55,7 @@ function! ttags#Highlight(tags) "{{{3
         endif
     endfor
     let acc += [
-                \ 'syn match TTags_source_dir / @\zs.*$/',
+                \ 'syn match TTags_source_dir / |.\{-}\s\zs(.*$/',
                 \ 'hi def link TTags_source_dir Directory'
                 \ ]
     " TLogVAR acc
@@ -93,7 +93,9 @@ endf
 "   constraints: A dictionary of fields and corresponding regexps
 function! ttags#SelectTags(use_extra, constraints) "{{{3
     let world      = copy(g:ttags_world)
-    let world.tags = tlib#tag#Collect(a:constraints, a:use_extra)
+    let world.tags = tlib#tag#Collect(a:constraints, a:use_extra,
+                \ tlib#var#Get('ttags_match_end', 'bg'),
+                \ tlib#var#Get('ttags_match_front', 'bg'))
     " TLogVAR world.tags
     if !empty(world.tags)
         let display = tlib#var#Get('ttags_display', 'bg')
@@ -110,11 +112,26 @@ function! ttags#SelectTags(use_extra, constraints) "{{{3
                 let world.scratch_vertical = 1
             endif
             let world.tlib_UseInputListScratch = ttags#Highlight(world.tags)
+            call s:SetOrigin(world)
             call tlib#input#ListD(world)
         endif
     else
         call s:NoTags()
     endif
+endf
+
+
+function! s:SetOrigin(world) "{{{3
+    let a:world.origin = {'bufnr': bufnr('%'), 'winnr': winnr(), 'pos': getpos('.')}
+endf
+
+
+function! s:RestoreOrigin(world) "{{{3
+    if a:world.origin.winnr != winnr()
+        exec a:world.origin.winnr .'wincmd w'
+    endif
+    exec 'buffer! '. a:world.origin.bufnr
+    call setpos('.', a:world.origin.pos)
 endf
 
 
@@ -126,20 +143,8 @@ endf
 
 
 function! s:FormatTag(tag) "{{{3
-    if a:tag.kind =~# '^[fm]'
-        if has_key(a:tag, 'signature')
-            let name = a:tag.name . a:tag.signature
-        elseif a:tag.cmd[0] == '/'
-            let name = a:tag.cmd
-            let name = substitute(name, '^/\^\?\s*', '', '')
-            let name = substitute(name, '\s*\$\?/$', '', '')
-        else
-            let name = a:tag.name
-        endif
-    else
-        let name = a:tag.name
-    endif
-    return printf('%s: %s | %s (%s)', a:tag.kind, name, fnamemodify(a:tag.filename, ":t"), fnamemodify(a:tag.filename, ":p:h"))
+    let name = tlib#tag#Format(a:tag)
+    return printf('%s: %-20s | %s (%s)', a:tag.kind, name, fnamemodify(a:tag.filename, ":t"), fnamemodify(a:tag.filename, ":p:h"))
 endf
 
 
@@ -203,12 +208,15 @@ endf
 
 
 function! ttags#GotoTag(world, selected) "{{{3
-    if !empty(a:selected)
+    if empty(a:selected)
+        call s:RestoreOrigin(a:world)
+    else
         if a:world.win_wnr != winnr()
             let world = tlib#agent#Suspend(a:world, a:selected)
             exec a:world.win_wnr .'wincmd w'
         endif
         call s:ShowTag(a:world, a:selected[0])
+        call s:SetOrigin(a:world)
     endif
     return a:world
 endf
